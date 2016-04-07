@@ -112,14 +112,19 @@ def to_bin(ipv4) :
 
 #===============================================================================
 #Function to build 32 bit tree
-def buildTree(node, depth):
-    if(depth > 0):
-        depth -= 1
-        print depth
-        node.left = Node(0)
-        buildTree(node.left, depth)
-        node.right = Node(1)
-        buildTree(node.right, depth)
+def buildTree(node, depth, addr):
+    if(depth < 32 and depth < len(addr)):
+        val = addr[depth]
+        depth += 1
+        if(int(val) == 0):
+            if(node.left == None):
+                node.left = Node(int(val))  
+            buildTree(node.left, depth, addr)
+        if(int(val) == 1):
+            if(node.right == None):
+                node.right = Node(int(val))
+            buildTree(node.right, depth, addr)
+                
         
         
         
@@ -159,10 +164,14 @@ def main():
     routesParser()
     arpParser()
     tree = Tree()
-    buildTree(tree.getRoot(), 4)
-    print(tree)
+    
+    # Build Tree
+    for key in routes_table:
+        buildTree(tree.getRoot(), 0, key)
+    
     #Print tables
-    #print routes_table
+    print(tree)
+    print routes_table
     #print arp_table
     
     #read PDUs from command line
