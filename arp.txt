@@ -1,3 +1,0 @@
-1.2.3.4 aa.bb.cc.dd.ee.ff
-5.6.7.8 gg.hh.ii.jj.kk.ll
-9.10.11.12 mm.nn.oo.pp.qq.rr.ss
