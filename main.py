@@ -11,6 +11,7 @@ arp_table = {}
 
 #===============================================================================
 #Node Class
+
 class Node:
 	def __init__(self, val):
 		self.right = None
@@ -21,6 +22,7 @@ class Node:
 		
 #===============================================================================
 #Tree Class
+
 class Tree:
 	#Initialize Value
 	def __init__(self):
@@ -31,7 +33,11 @@ class Tree:
 		return self.root
 	
 	#Add Address
+	# Takes binary or regular ip address
+	# Stores address in tree
 	def addAddr(self, addr):
+		if(len(addr) < 32):
+			addr = to_bin(addr)
 		node = self.root
 		if int(routes_table[addr][0]) == 0:
 			self.root.gateway = routes_table[addr][2]
@@ -55,7 +61,13 @@ class Tree:
 				node = node.right
 	
 	#Find Address
+	# Takes binary or regular ip address
+	# Retrive interface/gateway for address in Tree
+	# Returns a tuple in the form (gateway, interface)
+	# Prints 'Lost!' if an address can't be found
 	def findAddr(self, addr):
+		if(len(addr) < 32):
+			addr = to_bin(addr)
 		node = self.root
 		if int(routes_table[addr][0]) == 0:
 			return (node.gateway, node.interface)
@@ -153,7 +165,9 @@ def arpParser() :
 			
 #===============================================================================   
 #Main
+
 def main():
+	
 	#Create Tables
 	routesParser()
 	arpParser()
@@ -163,12 +177,9 @@ def main():
 	for key in routes_table:
 		tree.addAddr(key)
 	
-	for key in routes_table:
-		print tree.findAddr(key)
-	
 	#Read PDUs from command line
 	s = ""
-	print "Enter the PDU into the console:"
+	print "Enter the PDU into the console: "
 	while s != "exit":
 		s = raw_input()
 		s_list = s.split()
@@ -189,7 +200,7 @@ def main():
 				dest_addr = to_bin(s_list[2])
 				result = lcp(dest_addr, key) 
 				
-				if len(result) >= result_len:
+				if len(result) > result_len:
 					result_len = len(result)
 					result_addr = key
 			
