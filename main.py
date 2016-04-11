@@ -19,6 +19,7 @@ class Node:
 		self.val = val
 		self.gateway = None
 		self.interface = None
+		self.networkBits = None
 		
 #===============================================================================
 #Tree Class
@@ -42,10 +43,13 @@ class Tree:
 		if int(routes_table[addr][0]) == 0:
 			self.root.gateway = routes_table[addr][2]
 			self.root.interface = routes_table[addr][3]
+			self.root.networkBits = routes_table[addr][0]
+			#print "self.root.networkBits: " + routes_table[addr][0]
 		for i in range(len(addr)):
 			if i == int(routes_table[addr][0]) - 1:
 				node.gateway = routes_table[addr][2]
 				node.interface = routes_table[addr][3]
+				node.networkBits = routes_table[addr][0]
 			x = int(addr[i])
 			if x == 0:
 				if node.left == None:
@@ -63,28 +67,44 @@ class Tree:
 	#Find Address
 	# Takes binary or regular ip address
 	# Retrive interface/gateway for address in Tree
-	# Returns a tuple in the form (gateway, interface)
+	# Returns a tuple in the form (gateway, interface, networkBits)
 	# Prints 'Lost!' if an address can't be found
 	def findAddr(self, addr):
 		if(len(addr) < 32):
 			addr = to_bin(addr)
 		node = self.root
-		if int(routes_table[addr][0]) == 0:
-			return (node.gateway, node.interface)
+		answer = ()
+		
+		num_matched = 0
+		networkBits = 0
+		
 		for i in range(len(addr)):
-			if i == int(routes_table[addr][0]) - 1:
-				return (node.gateway, node.interface)
+			if node.gateway != None and node.interface != None:
+				networkBits = node.networkBits
+				answer = (node.gateway, node.interface, networkBits)
 			x = int(addr[i])
 			if x == 0:
-				if node.left.val == 0:
+				if node.left != None and node.left.val == 0:
 					node = node.left
 				else:
-					print "Lost!"
+					break
 			if x == 1:
-				if node.right.val == 1:
+				if node.right != None and node.right.val == 1:
 					node = node.right
 				else:
-					print "Lost!"
+					break
+			num_matched = num_matched + 1
+		
+		#print str(num_matched) + " < " + str(networkBits)
+		if int(num_matched) < int(networkBits):
+			
+			#0.0.0.0/0 case
+			zero = "00000000000000000000000000000000" 
+			if zero in routes_table.keys():
+				return (routes_table[zero][2], routes_table[zero][3], networkBits) 
+			
+			return ("Lost!")
+		return answer
 
 	#Print Tree
 	def __str__(self):
@@ -196,15 +216,16 @@ def main():
 			result_addr = ""
 			
 			#Get IPv4 prefix from routing table (most specific prefix)
-			for key in routes_table.keys():
-				dest_addr = to_bin(s_list[2])
-				result = lcp(dest_addr, key) 
-				
-				if len(result) > result_len:
-					result_len = len(result)
-					result_addr = key
+			try:
+				first_lookup = tree.findAddr(s_list[2])
+			except:
+				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " discarded (destination unreachable)"
+				continue
 			
-			print "result_addr: " + bin_to_ipv4(result_addr)
+			result = first_lookup[0]
+			
+			
+			interface = first_lookup[1]
 			
 			#Decrement the TTL by 1
 			TTL_expired = False
@@ -218,48 +239,45 @@ def main():
 				
 			# key - prefix address, 0 - prefix length, 1 - gateway address in binary,
 			#2 - regular gateway address, 3 - interface 
-			route_info = routes_table[result_addr]
+			#route_info = routes_table[result_addr]
 			
 			next_hop_result_addr = ""
 			next_hop_result_len = 0 
 			#Look up next hop address in routing table, to see if 
-			#the interface is point-to-point
-			for key in routes_table.keys():
-				next_hop_result = lcp(route_info[1], key) 
-				
-				if len(next_hop_result) > next_hop_result_len:
-					next_hop_result_len = len(next_hop_result)
-					next_hop_result_addr = key
-			#check to see if the interface is point-to-point
-			print "next_hop_result_addr" + bin_to_ipv4(next_hop_result_addr)
-			print "routes_table[next_hop_result_addr][2] :" + routes_table[next_hop_result_addr][2]
 			
+			try:
+				next_hop_result = tree.findAddr(result)
+			except:
+				#could not find route
+				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " discarded (destination unreachable)"
+				continue				
 			
-			#bool to save need to do a arp lookup or not. True = lookup, False = no lookup
-			arp_lookup = True
-			
-			if (routes_table[next_hop_result_addr][1] == ("0" * 32)):
-				
-				#in this case, we do not do an arp lookup
-				arp_lookup = False
-				
+			arp = ""
+			#if next_hop_result[2] == "32" or next_hop_result[0] != ("0.0.0.0"):
+			if True:
+				try:
+					r = result
+					if r == "0.0.0.0":
+						r = s_list[2]
+					
+					arp = "-" + arp_table[r]
+					
+				except:
+					arp = ""
 			
 			if TTL_expired:
 				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " discarded (TTL expired)"
 			
-			elif not arp_lookup:
-				
-				local = routes_table[ routes_table[next_hop_result_addr][1] ]
-				
-				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " via " + local[2] + " (" + local[3] + ")" + " ttl " + str(s_list[4]) 
 			
-			elif len(result) == 0:
+			elif result[0] == "Lost":
 				print "No route"
 				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " discarded (destination unreachable)"
 			
 			else:
-				
-				print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " via " + route_info[2] + " ttl " + str(s_list[4]) 
+				if result == "0.0.0.0":
+					print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " directly connected (" + interface + arp + ") ttl " + str(s_list[4]) 
+				else:
+					print s_list[1] + ":" + s_list[5] + "->" + s_list[2] + ":" + s_list[6] + " via " + result + "(" + interface + arp + ") ttl " + str(s_list[4]) 
 	
 if __name__ == "__main__":
 	main()
